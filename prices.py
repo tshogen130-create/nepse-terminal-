@@ -18,16 +18,26 @@ NUM = lambda s: (float(re.sub(r"[,\s%]", "", s)) if s and re.search(r"\d", s) el
 def merolagani(sess):
     r = sess.get("https://merolagani.com/LatestMarket.aspx", headers=HEADERS, timeout=30)
     r.raise_for_status()
+    soup = BeautifulSoup(r.text, "lxml")
+    # only the main market board: the table with the most >=7-cell rows.
+    # Side widgets (Top Turnover etc.) have 3-cell rows and must be ignored.
+    best, best_n = None, 0
+    for t in soup.find_all("table"):
+        n = sum(1 for tr in t.find_all("tr") if len(tr.find_all("td")) >= 7)
+        if n > best_n:
+            best, best_n = t, n
     out = {}
-    for tr in BeautifulSoup(r.text, "lxml").select("table tr"):
+    if best is None or best_n < 20:
+        return out
+    for tr in best.find_all("tr"):
         tds = tr.find_all("td")
-        if len(tds) < 3:
+        if len(tds) < 7:
             continue
         sym = tds[0].get_text(strip=True).upper()
         if sym not in SYMS:
             continue
         ltp = NUM(tds[1].get_text())
-        if ltp is None:
+        if ltp is None or ltp <= 0 or ltp > 100000:   # sanity cap
             continue
         out[sym] = {"ltp": ltp, "chg": NUM(tds[2].get_text())}
     return out

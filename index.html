@@ -243,13 +243,22 @@ let timer=null,countdown=60;
 function parseMarketHTML(html){
   const doc=new DOMParser().parseFromString(html,'text/html');
   const found={};
-  doc.querySelectorAll('table tr').forEach(tr=>{
-    const tds=tr.querySelectorAll('td'); if(tds.length<2)return;
+  /* pick ONLY the main market board: the table with the most >=7-cell rows.
+     Side widgets (Top Turnover / Top Gainers) have 3-cell rows and are ignored. */
+  let best=null,bestN=0;
+  doc.querySelectorAll('table').forEach(t=>{
+    let n=0; t.querySelectorAll('tr').forEach(tr=>{if(tr.querySelectorAll('td').length>=7)n++;});
+    if(n>bestN){bestN=n;best=t;}
+  });
+  if(!best||bestN<20)return found;
+  best.querySelectorAll('tr').forEach(tr=>{
+    const tds=tr.querySelectorAll('td'); if(tds.length<7)return;
     const sym=(tds[0].textContent||'').trim().toUpperCase();
     if(!KNOWN.has(sym))return;
     const n=t=>{const x=parseFloat((t||'').replace(/[,\s%]/g,''));return isFinite(x)?x:null;};
-    const ltp=n(tds[1].textContent); if(ltp==null)return;
-    found[sym]={ltp,chg:tds.length>2?n(tds[2].textContent):null};
+    const ltp=n(tds[1].textContent);
+    if(ltp==null||ltp<=0||ltp>100000)return;   /* sanity: no NEPSE share trades near 1 lakh */
+    found[sym]={ltp,chg:n(tds[2].textContent)};
   });
   return found;
 }
