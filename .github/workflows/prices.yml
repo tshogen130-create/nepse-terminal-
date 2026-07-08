@@ -1,0 +1,25 @@
+name: Update prices
+on:
+  schedule:
+    - cron: "*/15 5-9 * * 0-4"
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: prices
+  cancel-in-progress: true
+jobs:
+  prices:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements.txt
+      - run: python prices.py
+      - run: |
+          git config user.name "nepse-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add prices.json
+          git diff --cached --quiet || git commit -m "prices"
+          git push
